@@ -79,15 +79,14 @@ export function BookingClient({ slug }: BookingClientProps) {
     };
   }, [slug]);
 
-  // 2. Fetch available slots when Service or Date changes
+  // 2. Fetch available slots ONLY when Service ID or Date changes
   useEffect(() => {
-    if (!selectedService || !selectedDate || currentStep < 2) return;
+    if (!selectedService?.id || !selectedDate) return;
 
     let isMounted = true;
 
     async function loadSlots() {
       setIsLoadingSlots(true);
-      setSelectedSlot(null); // Reset selection on date/service change
 
       try {
         const availableSlots = await fetchAvailableSlots(
@@ -117,7 +116,7 @@ export function BookingClient({ slug }: BookingClientProps) {
     return () => {
       isMounted = false;
     };
-  }, [slug, selectedService, selectedDate, currentStep]);
+  }, [slug, selectedService?.id, selectedDate]);
 
   // Step access control
   const maxAccessibleStep: 1 | 2 | 3 = useMemo(() => {
@@ -245,7 +244,7 @@ export function BookingClient({ slug }: BookingClientProps) {
           </p>
           <a
             href="/"
-            className="mt-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-sm font-medium border border-white/10 transition-colors"
+            className="mt-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-sm font-medium border border-white/10 transition-colors cursor-pointer"
           >
             بازگشت به صفحه اصلی
           </a>
@@ -268,43 +267,75 @@ export function BookingClient({ slug }: BookingClientProps) {
         />
 
         {/* Dynamic Wizard Step Content */}
-        <div className="glass-panel rounded-3xl p-6 sm:p-8 relative">
+        <div className="glass-panel rounded-3xl p-6 sm:p-8 relative min-h-[300px]">
           {currentStep === 1 && (
             <ServiceSelection
               services={salon.services}
               selectedService={selectedService}
               onSelectService={(s) => {
                 setSelectedService(s);
+                setSelectedSlot(null);
               }}
               onNext={() => setCurrentStep(2)}
             />
           )}
 
-          {currentStep === 2 && selectedService && (
-            <SlotPicker
-              service={selectedService}
-              days={days}
-              selectedDate={selectedDate}
-              onSelectDate={(d) => setSelectedDate(d)}
-              slots={slots}
-              selectedSlot={selectedSlot}
-              onSelectSlot={(s) => setSelectedSlot(s)}
-              isLoadingSlots={isLoadingSlots}
-              onBack={() => setCurrentStep(1)}
-              onNext={() => setCurrentStep(3)}
-            />
+          {currentStep === 2 && (
+            selectedService ? (
+              <SlotPicker
+                service={selectedService}
+                days={days}
+                selectedDate={selectedDate}
+                onSelectDate={(d) => {
+                  setSelectedDate(d);
+                  setSelectedSlot(null);
+                }}
+                slots={slots}
+                selectedSlot={selectedSlot}
+                onSelectSlot={(s) => setSelectedSlot(s)}
+                isLoadingSlots={isLoadingSlots}
+                onBack={() => setCurrentStep(1)}
+                onNext={() => setCurrentStep(3)}
+              />
+            ) : (
+              <div className="text-center py-10 space-y-4">
+                <p className="text-sm text-slate-400">لطفاً ابتدا یک خدمت را انتخاب فرمایید.</p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-6 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-bold text-sm"
+                >
+                  بازگشت به انتخاب خدمت
+                </button>
+              </div>
+            )
           )}
 
-          {currentStep === 3 && selectedService && selectedSlot && (
-            <CustomerForm
-              service={selectedService}
-              date={selectedDate}
-              slot={selectedSlot}
-              onSubmit={handleBookingSubmit}
-              onBack={() => setCurrentStep(2)}
-              isSubmitting={isSubmitting}
-              errorMessage={bookingError}
-            />
+          {currentStep === 3 && (
+            selectedService && selectedSlot ? (
+              <CustomerForm
+                service={selectedService}
+                date={selectedDate}
+                slot={selectedSlot}
+                onSubmit={handleBookingSubmit}
+                onBack={() => setCurrentStep(2)}
+                isSubmitting={isSubmitting}
+                errorMessage={bookingError}
+              />
+            ) : (
+              <div className="text-center py-10 space-y-4">
+                <p className="text-sm text-slate-400">
+                  لطفاً ابتدا خدمت و ساعت مورد نظر خود را انتخاب فرمایید.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(selectedService ? 2 : 1)}
+                  className="px-6 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-bold text-sm"
+                >
+                  بازگشت و انتخاب ساعت
+                </button>
+              </div>
+            )
           )}
         </div>
       </div>
