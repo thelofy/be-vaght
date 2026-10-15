@@ -19,6 +19,29 @@ class StoreBookingRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation and sanitize potential XSS payloads.
+     */
+    protected function prepareForValidation(): void
+    {
+        $sanitize = function (?string $value): ?string {
+            if ($value === null) {
+                return null;
+            }
+
+            // Remove <script> tags and any code inside them
+            $stripped = preg_replace('#<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>#is', '', $value);
+
+            // Strip any remaining HTML tags and trim
+            return trim(strip_tags((string) $stripped));
+        };
+
+        $this->merge([
+            'customer_name' => $sanitize($this->customer_name),
+            'notes' => $sanitize($this->notes),
+        ]);
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>

@@ -16,5 +16,7 @@ Route::get('/user', function (Request $request) {
 Route::prefix('v1/salons/{slug}')->group(function () {
     Route::get('/', [BookingController::class, 'show'])->name('api.v1.salons.show');
     Route::get('/slots', [BookingController::class, 'slots'])->name('api.v1.salons.slots');
-    Route::post('/book', [BookingController::class, 'book'])->name('api.v1.salons.book');
+    Route::post('/book', [BookingController::class, 'book'])
+        ->middleware('throttle:10,1')
+        ->name('api.v1.salons.book');
 });
