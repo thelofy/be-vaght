@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Service } from "@/lib/api";
+import { Service, Slot } from "@/lib/api";
 import {
   formatAppointmentDateTime,
   formatPrice,
@@ -14,12 +14,14 @@ import {
   Loader2,
   CheckCircle2,
   AlertTriangle,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 
 interface CustomerFormProps {
   service: Service;
   date: string;
-  slot: string;
+  slot: Slot;
   onSubmit: (data: {
     customer_name: string;
     customer_phone: string;
@@ -69,37 +71,48 @@ export function CustomerForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Appointment Summary Card */}
-      <div className="glass-panel p-5 rounded-2xl space-y-3 border-amber-500/20 bg-amber-500/[0.03]">
+      {/* Summary Card with glowing metallic highlight */}
+      <div className="glass-panel p-5 rounded-2xl space-y-3.5 border-amber-500/25 bg-amber-500/[0.03] shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
         <div className="flex items-center justify-between pb-3 border-b border-white/5">
           <div className="space-y-0.5">
-            <span className="text-xs text-slate-400">خدمت درخواستی</span>
-            <h4 className="text-base font-bold text-white">{service.title}</h4>
+            <span className="text-xs text-slate-400 font-medium">خدمت انتخاب شده:</span>
+            <h4 className="text-base font-bold text-white flex items-center gap-2">
+              <span>{service.title}</span>
+              <span className="text-xs font-normal text-amber-400/90 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20">
+                {toPersianDigits(service.duration_minutes)} دقیقه
+              </span>
+            </h4>
           </div>
           <div className="text-left">
-            <span className="text-xs text-slate-400">مبلغ</span>
-            <p className="text-sm font-semibold text-amber-300">
+            <span className="text-xs text-slate-400 font-medium">هزینه نهایی:</span>
+            <p className="text-sm sm:text-base font-bold text-amber-300">
               {formatPrice(service.price, service.show_price)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-slate-300">
-          <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>{formatAppointmentDateTime(date, slot)}</span>
-          <span className="text-xs text-slate-400 bg-white/5 px-2 py-0.5 rounded-md mr-auto">
-            مدت: {toPersianDigits(service.duration_minutes)} دقیقه
-          </span>
+        <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-300">
+          <div className="flex items-center gap-1.5 bg-white/[0.04] px-3 py-1.5 rounded-xl border border-white/5">
+            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+            <span>{formatAppointmentDateTime(date, slot.starts_at)}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-white/[0.04] px-3 py-1.5 rounded-xl border border-white/5">
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <span>
+              پایان حدودی: <span dir="ltr">{toPersianDigits(slot.ends_at)}</span>
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Error alert if present */}
+      {/* Glass Styled Error Toast / Banner */}
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-start gap-3">
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-sm flex items-start gap-3 backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-200">
           <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">خطا در ثبت نوبت</p>
-            <p className="text-xs text-rose-300/90 mt-0.5">{errorMessage}</p>
+          <div className="space-y-0.5">
+            <p className="font-bold text-white">خطا در فرآیند رزرو</p>
+            <p className="text-xs text-rose-300/90 leading-relaxed">{errorMessage}</p>
           </div>
         </div>
       )}
@@ -119,11 +132,11 @@ export function CustomerForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => setTouched((p) => ({ ...p, name: true }))}
-            placeholder="مثال: آرش سپهری"
-            className={`w-full px-4 py-3 rounded-xl bg-white/[0.04] border text-white placeholder-slate-500 text-sm outline-none transition-all ${
+            placeholder="مثال: علی رضایی"
+            className={`w-full px-4 py-3.5 rounded-xl bg-white/[0.03] border text-white placeholder-slate-500 text-sm outline-none transition-all duration-200 ${
               touched.name && !isNameValid
-                ? "border-rose-500/50 focus:border-rose-400"
-                : "border-white/10 focus:border-amber-400/80 focus:bg-white/[0.06]"
+                ? "border-rose-500/60 focus:border-rose-400 bg-rose-500/[0.02]"
+                : "border-white/10 focus:border-amber-400/80 focus:bg-white/[0.06] focus:shadow-[0_0_15px_rgba(245,158,11,0.15)]"
             }`}
           />
           {touched.name && !isNameValid && (
@@ -135,7 +148,7 @@ export function CustomerForm({
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
             <Phone className="w-3.5 h-3.5 text-slate-400" />
-            <span>شماره موبایل (جهت ارسال پیامک و هماهنگی)</span>
+            <span>شماره موبایل (جهت تأیید و ارسال پیامک نوبت)</span>
             <span className="text-amber-400">*</span>
           </label>
           <input
@@ -147,15 +160,15 @@ export function CustomerForm({
             onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ""))}
             onBlur={() => setTouched((p) => ({ ...p, phone: true }))}
             placeholder="09123456789"
-            className={`w-full px-4 py-3 rounded-xl bg-white/[0.04] border text-white placeholder-slate-500 text-sm font-mono outline-none text-right transition-all ${
+            className={`w-full px-4 py-3.5 rounded-xl bg-white/[0.03] border text-white placeholder-slate-500 text-sm font-mono outline-none text-right transition-all duration-200 ${
               touched.phone && !isPhoneValid
-                ? "border-rose-500/50 focus:border-rose-400"
-                : "border-white/10 focus:border-amber-400/80 focus:bg-white/[0.06]"
+                ? "border-rose-500/60 focus:border-rose-400 bg-rose-500/[0.02]"
+                : "border-white/10 focus:border-amber-400/80 focus:bg-white/[0.06] focus:shadow-[0_0_15px_rgba(245,158,11,0.15)]"
             }`}
           />
           {touched.phone && !isPhoneValid && (
             <p className="text-xs text-rose-400">
-              شماره موبایل معتبر ۱۱ رقمی وارد نمایید (مثال: 09121234567).
+              شماره موبایل ۱۱ رقمی معتبر وارد نمایید (مثال: 09121234567).
             </p>
           )}
         </div>
@@ -164,13 +177,13 @@ export function CustomerForm({
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-slate-500" />
-            <span>تاریخ تولد (اختیاری - جهت دریافت تخفیف‌های مناسبتی)</span>
+            <span>تاریخ تولد (اختیاری - جهت دریافت هدایا و تخفیفات مناسبتی)</span>
           </label>
           <input
             type="date"
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-sm outline-none focus:border-amber-400/80 focus:bg-white/[0.06] transition-all"
+            className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-slate-500 text-sm outline-none focus:border-amber-400/80 focus:bg-white/[0.06] transition-all"
           />
         </div>
 
@@ -178,25 +191,25 @@ export function CustomerForm({
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-slate-500" />
-            <span>توضیحات یا یادداشت برای آرایشگر (اختیاری)</span>
+            <span>توضیحات اختیاری برای آرایشگر</span>
           </label>
           <textarea
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="مثال: ترجیحاً اصلاح دور مو سفید نشود..."
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-sm outline-none focus:border-amber-400/80 focus:bg-white/[0.06] transition-all resize-none"
+            placeholder="مثال: ترجیحاً اصلاح دور مو با شماره ۱ انجام شود..."
+            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-slate-500 text-sm outline-none focus:border-amber-400/80 focus:bg-white/[0.06] transition-all resize-none"
           />
         </div>
       </div>
 
-      {/* Buttons */}
+      {/* Action Buttons */}
       <div className="flex items-center justify-between pt-4 border-t border-white/5">
         <button
           type="button"
           onClick={onBack}
           disabled={isSubmitting}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white glass-panel-interactive"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white glass-panel-interactive cursor-pointer"
         >
           <ArrowRight className="w-4 h-4" />
           <span>تغییر ساعت</span>
@@ -205,21 +218,21 @@ export function CustomerForm({
         <button
           type="submit"
           disabled={!isFormValid || isSubmitting}
-          className={`flex items-center gap-2.5 px-7 py-3.5 rounded-xl font-bold text-sm transition-all ${
+          className={`flex items-center gap-2.5 px-8 py-4 rounded-xl font-bold text-sm transition-all duration-200 ${
             isFormValid && !isSubmitting
-              ? "bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer shadow-[0_0_25px_rgba(245,158,11,0.3)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] active:scale-[0.98]"
+              ? "bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 cursor-pointer shadow-[0_0_25px_rgba(245,158,11,0.35)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)] active:scale-[0.98]"
               : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
           }`}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-              <span>در حال ثبت نوبت...</span>
+              <span>در حال ارسال اطلاعات...</span>
             </>
           ) : (
             <>
-              <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-              <span>تأیید و ثبت نوبت</span>
+              <Sparkles className="w-4 h-4 stroke-[2.5]" />
+              <span>تأیید و ثبت نهایی رزرو</span>
             </>
           )}
         </button>

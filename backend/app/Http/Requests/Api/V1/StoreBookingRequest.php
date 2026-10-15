@@ -35,7 +35,22 @@ class StoreBookingRequest extends FormRequest
             return trim(strip_tags((string) $stripped));
         };
 
+        $date = $this->date;
+        $startTime = $this->start_time;
+
+        if ($this->has('starts_at') && (! $date || ! $startTime)) {
+            try {
+                $carbon = \Carbon\Carbon::parse($this->starts_at);
+                $date = $date ?: $carbon->toDateString();
+                $startTime = $startTime ?: $carbon->format('H:i');
+            } catch (\Throwable) {
+                // Ignore parse error, validation rules will handle invalid date/time
+            }
+        }
+
         $this->merge([
+            'date' => $date,
+            'start_time' => $startTime,
             'customer_name' => $sanitize($this->customer_name),
             'notes' => $sanitize($this->notes),
         ]);

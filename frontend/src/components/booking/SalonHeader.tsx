@@ -8,8 +8,12 @@ interface SalonHeaderProps {
 }
 
 export function SalonHeader({ salon }: SalonHeaderProps) {
-  const openingDisplay = toPersianDigits(salon.opening_time.slice(0, 5));
-  const closingDisplay = toPersianDigits(salon.closing_time.slice(0, 5));
+  const openingDisplay = salon.opening_time
+    ? toPersianDigits(salon.opening_time.slice(0, 5))
+    : "۱۰:۰۰";
+  const closingDisplay = salon.closing_time
+    ? toPersianDigits(salon.closing_time.slice(0, 5))
+    : "۲۲:۰۰";
 
   return (
     <header className="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden mb-6">

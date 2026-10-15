@@ -48,7 +48,7 @@ export function SuccessModal({
               <span className="font-bold text-white">{salon.name}</span>
             </div>
             <span className="text-xs text-amber-400 font-mono bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-              کد: #{toPersianDigits(appointment.id)}
+              کد: #{appointment.id ? toPersianDigits(appointment.id) : "ثبت‌شده"}
             </span>
           </div>
 
@@ -56,25 +56,34 @@ export function SuccessModal({
           <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
             <div className="space-y-1">
               <span className="text-slate-400">خدمت:</span>
-              <p className="font-semibold text-white">{appointment.service.title}</p>
+              <p className="font-semibold text-white">
+                {appointment.service?.title || "خدمت آرایشگاه"}
+              </p>
             </div>
 
             <div className="space-y-1">
               <span className="text-slate-400">مبلغ:</span>
               <p className="font-semibold text-amber-300">
-                {formatPrice(appointment.service.price, appointment.service.show_price)}
+                {formatPrice(
+                  appointment.service?.price ?? null,
+                  appointment.service?.show_price ?? true
+                )}
               </p>
             </div>
 
             <div className="space-y-1">
               <span className="text-slate-400">مشتری:</span>
-              <p className="font-semibold text-white">{appointment.customer.name}</p>
+              <p className="font-semibold text-white">
+                {appointment.customer?.name || "مشتری گرامی"}
+              </p>
             </div>
 
             <div className="space-y-1">
               <span className="text-slate-400">شماره تماس:</span>
               <p className="font-semibold text-white" dir="ltr">
-                {toPersianDigits(appointment.customer.phone)}
+                {appointment.customer?.phone
+                  ? toPersianDigits(appointment.customer.phone)
+                  : "-"}
               </p>
             </div>
           </div>

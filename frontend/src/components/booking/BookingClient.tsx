@@ -2,12 +2,14 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import {
-  fetchSalon,
+  fetchSalonBySlug,
   fetchAvailableSlots,
-  submitBooking,
+  createBooking,
   Salon,
   Service,
-  Appointment,
+  Slot,
+  BookingResponse,
+  ApiError,
 } from "@/lib/api";
 import { getNextDays } from "@/lib/formatters";
 import { SalonHeader } from "./SalonHeader";
@@ -25,7 +27,6 @@ interface BookingClientProps {
 export function BookingClient({ slug }: BookingClientProps) {
   // Page level state
   const [salon, setSalon] = useState<Salon | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
 
@@ -36,14 +37,14 @@ export function BookingClient({ slug }: BookingClientProps) {
   // Dates & Slots
   const days = useMemo(() => getNextDays(7), []);
   const [selectedDate, setSelectedDate] = useState<string>(days[0]?.date || "");
-  const [slots, setSlots] = useState<string[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
   // Submission & Conflict State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [completedAppointment, setCompletedAppointment] = useState<Appointment | null>(null);
+  const [bookingResult, setBookingResult] = useState<BookingResponse | null>(null);
 
   // 1. Fetch Salon metadata on initial load
   useEffect(() => {
@@ -54,10 +55,9 @@ export function BookingClient({ slug }: BookingClientProps) {
       setInitialError(null);
 
       try {
-        const data = await fetchSalon(slug);
+        const salonData = await fetchSalonBySlug(slug);
         if (isMounted) {
-          setSalon(data.salon);
-          setServices(data.services);
+          setSalon(salonData);
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -87,7 +87,7 @@ export function BookingClient({ slug }: BookingClientProps) {
 
     async function loadSlots() {
       setIsLoadingSlots(true);
-      setSelectedSlot(null); // Reset selection on change
+      setSelectedSlot(null); // Reset selection on date/service change
 
       try {
         const availableSlots = await fetchAvailableSlots(
@@ -98,9 +98,12 @@ export function BookingClient({ slug }: BookingClientProps) {
         if (isMounted) {
           setSlots(availableSlots);
         }
-      } catch {
+      } catch (err: unknown) {
         if (isMounted) {
           setSlots([]);
+          if (err instanceof ApiError && err.isRateLimited) {
+            setBookingError(err.message);
+          }
         }
       } finally {
         if (isMounted) {
@@ -136,40 +139,39 @@ export function BookingClient({ slug }: BookingClientProps) {
     setBookingError(null);
 
     try {
-      const appointment = await submitBooking(slug, {
+      const response = await createBooking(slug, {
         service_id: selectedService.id,
-        date: selectedDate,
-        start_time: selectedSlot,
+        starts_at: `${selectedDate} ${selectedSlot.starts_at}`,
         customer_name: customerData.customer_name,
         customer_phone: customerData.customer_phone,
-        customer_birth_date: customerData.customer_birth_date,
         notes: customerData.notes,
       });
 
-      setCompletedAppointment(appointment);
+      setBookingResult(response);
     } catch (err: unknown) {
-      const errorObj = err as { status?: number; message?: string };
-      if (errorObj?.status === 409) {
-        setBookingError("این زمان لحظاتی پیش رزرو شد، لطفاً زمان دیگری انتخاب کنید.");
-        // Reload slots to reflect newly occupied slot
-        if (selectedService) {
-          setIsLoadingSlots(true);
-          try {
-            const reloadedSlots = await fetchAvailableSlots(
-              slug,
-              selectedDate,
-              selectedService.id
-            );
-            setSlots(reloadedSlots);
-          } finally {
-            setIsLoadingSlots(false);
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          setBookingError("این زمان لحظاتی پیش رزرو شد، لطفاً زمان دیگری انتخاب کنید.");
+          // Reload slots to reflect newly occupied slot
+          if (selectedService) {
+            setIsLoadingSlots(true);
+            try {
+              const reloadedSlots = await fetchAvailableSlots(
+                slug,
+                selectedDate,
+                selectedService.id
+              );
+              setSlots(reloadedSlots);
+            } finally {
+              setIsLoadingSlots(false);
+            }
           }
+          setCurrentStep(2);
+        } else {
+          setBookingError(err.message);
         }
-        setCurrentStep(2);
       } else {
-        setBookingError(
-          errorObj?.message || "متأسفانه مشکلی در ثبت نوبت رخ داد. لطفاً مجدداً تلاش فرمایید."
-        );
+        setBookingError("متأسفانه مشکلی در ثبت نوبت رخ داد. لطفاً مجدداً تلاش فرمایید.");
       }
     } finally {
       setIsSubmitting(false);
@@ -177,29 +179,59 @@ export function BookingClient({ slug }: BookingClientProps) {
   };
 
   const handleReset = () => {
-    setCompletedAppointment(null);
+    setBookingResult(null);
     setCurrentStep(1);
     setSelectedService(null);
     setSelectedSlot(null);
     setBookingError(null);
   };
 
-  // Loading Screen
+  // Full Skeleton Loader for Initial Fetch
   if (isLoadingInitial) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <div className="glass-panel p-8 rounded-3xl flex flex-col items-center gap-4 max-w-sm w-full">
-          <div className="w-14 h-14 rounded-2xl bg-amber-400/10 flex items-center justify-center text-amber-400">
-            <Scissors className="w-7 h-7 animate-pulse" />
+      <main className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto flex flex-col justify-between">
+        <div className="space-y-6">
+          {/* Header Skeleton */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/10" />
+              <div className="space-y-2 flex-1">
+                <div className="h-6 w-48 bg-white/10 rounded-md" />
+                <div className="h-4 w-72 bg-white/5 rounded-md" />
+              </div>
+            </div>
           </div>
-          <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-          <p className="text-sm text-slate-300 font-medium">در حال دریافت اطلاعات سالن...</p>
+
+          {/* Step Indicator Skeleton */}
+          <div className="glass-panel rounded-2xl p-4 animate-pulse">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="h-9 bg-white/10 rounded-xl" />
+              <div className="h-9 bg-white/5 rounded-xl" />
+              <div className="h-9 bg-white/5 rounded-xl" />
+            </div>
+          </div>
+
+          {/* Body Skeleton */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 animate-pulse">
+            <div className="h-6 w-36 bg-white/10 rounded-md mb-6" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="h-32 bg-white/5 rounded-2xl" />
+              <div className="h-32 bg-white/5 rounded-2xl" />
+              <div className="h-32 bg-white/5 rounded-2xl" />
+              <div className="h-32 bg-white/5 rounded-2xl" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+          <span>در حال دریافت اطلاعات سالن...</span>
         </div>
       </main>
     );
   }
 
-  // 404 / Error Screen
+  // Clean 404 / Error Screen
   if (initialError || !salon) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
@@ -209,7 +241,7 @@ export function BookingClient({ slug }: BookingClientProps) {
           </div>
           <h2 className="text-xl font-bold text-white">سالن مورد نظر یافت نشد</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
-            آدرس وارد شده معتبر نیست یا ممکن است این سالن در حال حاضر غیرفعال باشد.
+            آدرس سالن نامعتبر است یا این سالن در سامانه غیرفعال می‌باشد.
           </p>
           <a
             href="/"
@@ -225,23 +257,25 @@ export function BookingClient({ slug }: BookingClientProps) {
   return (
     <main className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto flex flex-col justify-between">
       <div>
-        {/* Salon Branding Header */}
+        {/* Salon Branding Header with glowing metallic glass */}
         <SalonHeader salon={salon} />
 
-        {/* 3-Step Indicator */}
+        {/* 3-Step Wizard Indicator */}
         <StepIndicator
           currentStep={currentStep}
           onStepClick={(step) => setCurrentStep(step)}
           maxAccessibleStep={maxAccessibleStep}
         />
 
-        {/* Dynamic Step Content */}
+        {/* Dynamic Wizard Step Content */}
         <div className="glass-panel rounded-3xl p-6 sm:p-8 relative">
           {currentStep === 1 && (
             <ServiceSelection
-              services={services}
+              services={salon.services}
               selectedService={selectedService}
-              onSelectService={(s) => setSelectedService(s)}
+              onSelectService={(s) => {
+                setSelectedService(s);
+              }}
               onNext={() => setCurrentStep(2)}
             />
           )}
@@ -275,10 +309,10 @@ export function BookingClient({ slug }: BookingClientProps) {
         </div>
       </div>
 
-      {/* Success Receipt Modal */}
-      {completedAppointment && (
+      {/* Success Celebration Receipt Modal */}
+      {bookingResult?.appointment && (
         <SuccessModal
-          appointment={completedAppointment}
+          appointment={bookingResult.appointment}
           salon={salon}
           onReset={handleReset}
         />

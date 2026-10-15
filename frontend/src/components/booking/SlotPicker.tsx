@@ -1,16 +1,16 @@
 import React from "react";
-import { Service } from "@/lib/api";
+import { Service, Slot } from "@/lib/api";
 import { DayPill, toPersianDigits } from "@/lib/formatters";
-import { Clock, Calendar, ArrowLeft, ArrowRight, AlertCircle } from "lucide-react";
+import { Clock, Calendar, ArrowLeft, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
 
 interface SlotPickerProps {
   service: Service;
   days: DayPill[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
-  slots: string[];
-  selectedSlot: string | null;
-  onSelectSlot: (slot: string) => void;
+  slots: Slot[];
+  selectedSlot: Slot | null;
+  onSelectSlot: (slot: Slot) => void;
   isLoadingSlots: boolean;
   onBack: () => void;
   onNext: () => void;
@@ -28,15 +28,17 @@ export function SlotPicker({
   onBack,
   onNext,
 }: SlotPickerProps) {
+  const availableSlotsCount = slots.filter((s) => s.available).length;
+
   return (
     <div className="space-y-6">
       {/* Service summary bar */}
-      <div className="glass-panel p-4 rounded-2xl flex items-center justify-between text-xs sm:text-sm">
+      <div className="glass-panel p-4 rounded-2xl flex items-center justify-between text-xs sm:text-sm border-white/10 bg-white/[0.03]">
         <div className="flex items-center gap-2">
           <span className="text-slate-400">خدمت انتخابی:</span>
-          <span className="text-white font-semibold">{service.title}</span>
+          <span className="text-white font-bold">{service.title}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-amber-400 font-medium bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/20">
+        <div className="flex items-center gap-1.5 text-amber-400 font-medium bg-amber-400/10 px-3 py-1 rounded-xl border border-amber-400/20">
           <Clock className="w-3.5 h-3.5" />
           <span>{toPersianDigits(service.duration_minutes)} دقیقه</span>
         </div>
@@ -61,15 +63,15 @@ export function SlotPicker({
                 key={day.date}
                 type="button"
                 onClick={() => onSelectDate(day.date)}
-                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[85px] sm:min-w-[95px] py-3 px-3 rounded-2xl cursor-pointer transition-all ${
+                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[85px] sm:min-w-[95px] py-3 px-3 rounded-2xl cursor-pointer transition-all duration-200 ${
                   isSelected
-                    ? "bg-amber-500/15 border-amber-400 text-white shadow-[0_0_20px_rgba(245,158,11,0.2)] border"
+                    ? "bg-amber-500/20 border-amber-400 text-white shadow-[0_0_25px_rgba(245,158,11,0.25)] border scale-[1.02]"
                     : "glass-panel-interactive text-slate-300 hover:text-white"
                 }`}
               >
                 <span
                   className={`text-xs font-medium mb-1 ${
-                    isSelected ? "text-amber-400" : "text-slate-400"
+                    isSelected ? "text-amber-400 font-bold" : "text-slate-400"
                   }`}
                 >
                   {day.dayName}
@@ -91,8 +93,8 @@ export function SlotPicker({
             <span>ساعت نوبت:</span>
           </h3>
           <span className="text-xs text-slate-400">
-            {slots.length > 0 && !isLoadingSlots
-              ? `${toPersianDigits(slots.length)} زمان آزاد`
+            {!isLoadingSlots && availableSlotsCount > 0
+              ? `${toPersianDigits(availableSlotsCount)} زمان آزاد`
               : ""}
           </span>
         </div>
@@ -103,12 +105,12 @@ export function SlotPicker({
             {Array.from({ length: 12 }).map((_, i) => (
               <div
                 key={i}
-                className="h-12 rounded-xl bg-white/[0.03] border border-white/5 animate-pulse"
+                className="h-12 rounded-xl bg-white/[0.04] border border-white/5 animate-pulse"
               />
             ))}
           </div>
         ) : slots.length === 0 ? (
-          <div className="glass-panel rounded-2xl p-8 text-center space-y-2">
+          <div className="glass-panel rounded-2xl p-8 text-center space-y-2 border-white/5">
             <AlertCircle className="w-8 h-8 text-amber-400/80 mx-auto" />
             <p className="text-sm font-medium text-slate-200">
               هیچ نوبت آزادی در این تاریخ یافت نشد.
@@ -120,20 +122,27 @@ export function SlotPicker({
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
             {slots.map((slot) => {
-              const isSelected = selectedSlot === slot;
+              const isSelected = selectedSlot?.starts_at === slot.starts_at;
+              const isAvailable = slot.available;
 
               return (
                 <button
-                  key={slot}
+                  key={slot.starts_at}
                   type="button"
-                  onClick={() => onSelectSlot(slot)}
-                  className={`py-3 px-2 rounded-xl text-center text-sm font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.3)] font-bold scale-[1.02]"
-                      : "glass-panel-interactive text-slate-200 hover:text-white hover:bg-white/[0.08]"
+                  disabled={!isAvailable}
+                  onClick={() => isAvailable && onSelectSlot(slot)}
+                  className={`py-3 px-2 rounded-xl text-center text-sm font-semibold transition-all duration-200 relative ${
+                    !isAvailable
+                      ? "opacity-30 bg-white/[0.01] border border-white/5 text-slate-500 cursor-not-allowed line-through"
+                      : isSelected
+                      ? "bg-amber-400 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)] font-bold scale-[1.03] border-amber-300"
+                      : "glass-panel-interactive text-slate-200 hover:text-white hover:bg-white/[0.07] hover:border-white/20 cursor-pointer"
                   }`}
                 >
-                  <span dir="ltr">{toPersianDigits(slot)}</span>
+                  <span dir="ltr">{toPersianDigits(slot.starts_at)}</span>
+                  {isSelected && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  )}
                 </button>
               );
             })}
@@ -146,7 +155,7 @@ export function SlotPicker({
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white glass-panel-interactive"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white glass-panel-interactive cursor-pointer"
         >
           <ArrowRight className="w-4 h-4" />
           <span>تغییر خدمت</span>
@@ -156,13 +165,14 @@ export function SlotPicker({
           type="button"
           disabled={!selectedSlot}
           onClick={onNext}
-          className={`flex items-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-sm transition-all ${
+          className={`flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm transition-all duration-200 ${
             selectedSlot
-              ? "bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.4)]"
+              ? "bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:shadow-[0_0_28px_rgba(245,158,11,0.45)] active:scale-[0.98]"
               : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
           }`}
         >
-          <span>مرحله بعد: ثبت مشخصات</span>
+          <Sparkles className="w-4 h-4" />
+          <span>مرحله بعد: ثبت نهایی</span>
           <ArrowLeft className="w-4 h-4" />
         </button>
       </div>
